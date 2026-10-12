@@ -25,7 +25,7 @@ export type Task = SingleChoiceTask | ShortTextTask;
 export type TrainingSet = {
   id: string;
   title: string;
-  tasks: readonly Task[];
+  tasks: Task[];
 };
 
 export type SingleChoiceAnswer = {
@@ -43,14 +43,14 @@ export type ShortTextAnswer = {
 export type Answer = SingleChoiceAnswer | ShortTextAnswer;
 
 export function findTaskById(
-  tasks: readonly Task[],
+  tasks: Task[],
   taskId: string
 ): Task | undefined {
   return tasks.find((task) => task.id === taskId);
 }
 
 export function filterTasksByTopic(
-  tasks: readonly Task[],
+  tasks: Task[],
   topic: string
 ): Task[] {
   return tasks.filter((task) => task.topic === topic);
@@ -66,7 +66,7 @@ export function isAnswerFilled(answer: Answer): boolean {
 
 export function calculateProgress(
   bts: TrainingSet,
-  answers: readonly Answer[]
+  answers: Answer[]
 ): { filled: number; total: number } {
   let filled = 0;
 

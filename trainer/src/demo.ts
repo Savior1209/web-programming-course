@@ -36,6 +36,7 @@ const sampleSet1: TrainingSet = {
   ],
 };
 
+
 const sampleSet2: TrainingSet = {
   id: "set-empty-theme",
   title: "Другая тема",
@@ -47,6 +48,15 @@ const userAnswers: Answer[] = [
   { taskId: "react-1", kind: "short-text", text: " " },
   { taskId: "html-1", kind: "short-text", text: "Ответ" },
 ];
+
+const userAnswers2: Answer[] = [
+  { taskId: "ts-1", kind: "single-choice", optionId: "b" },
+  { taskId: "react-1", kind: "short-text", text: "bts" },
+  { taskId: "html-1", kind: "short-text", text: "Ответ" },
+];
+
+const beforeTask = sampleSet1.tasks.length;
+const beforeAnswer = userAnswers.length;
 
 console.log("ДЕМО");
 
@@ -69,14 +79,17 @@ console.log(`  react: ${reactCount}`);
 console.log(`  vue: ${vueCount}`);
 
 console.log("\nПрогресс");
+const fullProgress = calculateProgress(sampleSet1, userAnswers2);
 const mainProgress = calculateProgress(sampleSet1, userAnswers);
 const emptyProgress = calculateProgress(sampleSet2, userAnswers);
 
+console.log(`  Все отвечены: ${fullProgress.filled} из ${fullProgress.total}`);
 console.log(`  web-basics: ${mainProgress.filled} из ${mainProgress.total}`);
 console.log(`  пустой набор: ${emptyProgress.filled} из ${emptyProgress.total}`);
 
 console.log("\nЧистота функций");
 console.log(
-  `  задачи не изменились: ${sampleSet1.tasks.length === 2 ? "да" : "нет"}`);
+  `  задачи не изменились: ${sampleSet1.tasks.length === beforeTask ? "да" : "нет"}`);
 console.log(
-  `  ответы не изменились: ${userAnswers.length === 3 ? "да" : "нет"}`);
+  `  ответы не изменились: ${userAnswers.length === beforeAnswer ? "да" : "нет"}`);
+  
