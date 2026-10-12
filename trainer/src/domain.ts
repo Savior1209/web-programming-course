@@ -56,13 +56,18 @@ export function filterTasksByTopic(
   return tasks.filter((task) => task.topic === topic);
 }
 
-export function isAnswerFilled(answer: Answer): boolean {
-  if (answer.kind === "short-text") {
+export function isAnswerFilled(answer: Answer, task: Task): boolean {
+  if (answer.kind === "short-text" && task.kind === "short-text") {
     return answer.text.trim() !== "";
   }
 
-  return answer.optionId !== "";
+  if (answer.kind === "single-choice" && task.kind === "single-choice") {
+    return task.options.some((option) => option.id === answer.optionId);
+  }
+
+  return false;
 }
+
 
 export function calculateProgress(
   bts: TrainingSet,
@@ -72,7 +77,7 @@ export function calculateProgress(
 
   for (const task of bts.tasks) {
     const answer = answers.find((i) => i.taskId === task.id);
-    if (answer !== undefined && isAnswerFilled(answer)) {
+    if (answer !== undefined && isAnswerFilled(answer, task)) {
       filled += 1;
     }
   }
