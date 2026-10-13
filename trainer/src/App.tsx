@@ -1,5 +1,8 @@
 import { useState } from "react";
-import type { Task, TrainingSet } from "./domain";
+import type { TrainingSet } from "./domain";
+import { findTaskById } from "./domain";
+import { TaskList } from "./components/TaskList";
+import { TaskCard } from "./components/TaskCard";
 
 const moduleSet: TrainingSet = {
   id: "web-basics",
@@ -44,85 +47,37 @@ const moduleSet: TrainingSet = {
   ],
 };
 
-type TaskListProps = {
-  tasks: Task[];
-  selectedId: string;
-  onSelect: (taskId: string) => void;
-};
-
-function TaskList({ tasks, selectedId, onSelect }: TaskListProps) {
-  return (
-    <ul>
-      {tasks.map((task) => (
-        <li key={task.id}>
-          <button
-            type="button"
-            onClick={() => onSelect(task.id)}
-            aria-current={task.id === selectedId}
-          >
-            {task.id} — {task.topic}
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-type TaskCardProps = {
-  task: Task;
-};
-
-function TaskCard({ task }: TaskCardProps) {
-  return (
-    <article>
-      <p>Тема: {task.topic}</p>
-      <p>{task.prompt}</p>
-
-      {task.code !== undefined && (
-        <pre>{task.code}</pre>
-      )}
-
-      {task.kind === "single-choice" ? (
-        <ul>
-          {task.options.map((option) => (
-            <li key={option.id}>{option.label}</li>
-          ))}
-        </ul>
-      ) : (
-        <p>Текстовый ответ: (поле ввода).</p>
-      )}
-    </article>
-  );
-}
-
 export default function App() {
   const [selectedId, setSelectedId] = useState<string>(moduleSet.tasks[0]?.id ?? "");
 
-  const selectedTask = moduleSet.tasks.find((task) => task.id === selectedId);
+  const currentTask = findTaskById(moduleSet.tasks, selectedId);
+
+  if (moduleSet.tasks.length === 0) {
+    return (
+      <main>
+        <h1>{moduleSet.title}</h1>
+        <p>В модуле нет заданий.</p>
+      </main>
+    );
+  }
 
   return (
     <main>
       <h1>
         {moduleSet.title} — заданий: {moduleSet.tasks.length}
       </h1>
-
-      {moduleSet.tasks.length === 0 ? (
-        <p>В модуле нет заданий.</p>
-      ) : (
-        <>
+        
           <TaskList
             tasks={moduleSet.tasks}
             selectedId={selectedId}
             onSelect={setSelectedId}
           />
 
-          {selectedTask ? (
-            <TaskCard task={selectedTask} />
+          {currentTask ? (
+            <TaskCard task={currentTask} />
           ) : (
             <p>Выбранное задание не найдено.</p>
           )}
-        </>
-      )}
     </main>
   );
 }
