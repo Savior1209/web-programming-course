@@ -6,9 +6,10 @@ type TaskReviewProps = {
   answers: Answer[];
   onClear?: (taskId: string) => void;
   onSelectTask?: (taskId: string) => void;
+  disabled?: boolean;
 };
 
-export function TaskReview({ tasks, answers, onClear, onSelectTask }: TaskReviewProps) {
+export function TaskReview({ tasks, answers, onClear, onSelectTask, disabled }: TaskReviewProps) {
   return (
     <div style={{ marginTop: 20 }}>
       <h3>Обзор ответов:</h3>
@@ -20,7 +21,10 @@ export function TaskReview({ tasks, answers, onClear, onSelectTask }: TaskReview
           let answerText = "Нет ответа";
           if (answer) {
             if (answer.kind === "single-choice") {
-              answerText = `Выбран вариант: ${answer.optionId}`;
+              const option = task.kind === "single-choice"
+                ? task.options.find((o) => o.id === answer.optionId)
+                : undefined;
+              answerText = `Выбран вариант: ${option?.label ?? answer.optionId}`;
             } else {
               answerText = `Текст: "${answer.text}"`;
             }
@@ -40,8 +44,8 @@ export function TaskReview({ tasks, answers, onClear, onSelectTask }: TaskReview
                 {onSelectTask && (
                   <button 
                     onClick={() => onSelectTask(task.id)}
-                    className="btn-secondary"
-                    style={{ padding: "4px 10px", fontSize: "0.85rem" }}
+                    className="btn-secondary btn-sm"
+                    disabled={disabled}
                   >
                     Перейти к заданию
                   </button>
@@ -50,8 +54,8 @@ export function TaskReview({ tasks, answers, onClear, onSelectTask }: TaskReview
                 {onClear && answer && (
                   <button 
                     onClick={() => onClear(task.id)}
-                    className="btn-secondary"
-                    style={{ padding: "4px 10px", fontSize: "0.85rem" }}
+                    className="btn-secondary btn-sm"
+                    disabled={disabled}
                   >
                     Очистить
                   </button>

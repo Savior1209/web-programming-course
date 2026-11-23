@@ -1,129 +1,223 @@
-import { useReducer, useState } from "react";
-import type { TrainingSet } from "./domain";
-import { findTaskById, calculateProgress } from "./domain";
-import { attemptReducer, getUnansweredTasks } from "./attempt";
+import { useEffect, useState } from "react";
+import type { TrainingSet, Answer } from "./domain";
+import { findTaskById } from "./domain";
+import { loadSet } from "./api/sets";
+import {createAttempt, loadAttempt, saveAnswer, deleteAnswer, submitAttempt, loadResult, type ServerAttempt} from "./api/attempts";
+import {saveAttemptId,readAttemptId,clearAttemptId,type RequestState} from "./model/attemptServer";
 import { TaskList } from "./components/TaskList";
 import { TaskCard } from "./components/TaskCard";
 import { TaskReview } from "./components/TaskReview";
+import { AttemptResult } from "./components/AttemptResult";
 
-const moduleSet: TrainingSet = {
-  id: "web-basics",
-  title: "Основы веб-программирования",
-  tasks: [
-    {
-      id: "ts-1",
-      kind: "single-choice",
-      topic: "typescript",
-      prompt: "Что выведет этот JavaScript-код?",
-      code: 'console.log("10" * 5);',
-      options: [
-        { id: "a", label: "105" },
-        { id: "b", label: "50" },
-        { id: "c", label: "Ошибка" },
-      ],
-    },
-    {
-      id: "react-1",
-      kind: "short-text",
-      topic: "react",
-      prompt: "Объясните, чем props компонента отличаются от его состояния.",
-    },
-    {
-      id: "react-2",
-      kind: "single-choice",
-      topic: "react",
-      prompt: "Почему в списке элементов рекомендуется использовать стабильный key, а не индекс массива?",
-      options: [
-        { id: "a", label: "Потому что индекс запрещён в React" },
-        { id: "b", label: "Потому что при вставке или удалении элемента индекс меняется и React может перепутать строки" },
-        { id: "c", label: "Потому что индекс работает только в классовых компонентах" },
-        { id: "d", label: "Потому что index замедляет рендер в 10 раз" },
-      ],
-    },
-    {
-      id: "html-1",
-      kind: "short-text",
-      topic: "html",
-      prompt: "Зачем нужен <form> в HTML?",
-    },
-  ],
-};
+const SET_ID = "web-basics";
 
 export default function App() {
-  const [attempt, dispatch] = useReducer(attemptReducer, {
-    status: "in-progress",
-    answers: [],
-  });
-  
-  const [selectedId, setSelectedId] = useState<string>(moduleSet.tasks[0]?.id ?? "");
+  const [set, setSet] = useState<TrainingSet | null>(null);
+  const [attempt, setAttempt] = useState<ServerAttempt | null>(null);
+  const [selectedId, setSelectedId] = useState<string>("");
   const [showReview, setShowReview] = useState(false);
+  const [requestState, setRequestState] = useState<RequestState>({ status: "idle" });
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [submittedResult, setSubmittedResult] = useState<ServerAttempt["result"]>(null);
+  const [isPending, setIsPending] = useState(false);
+  const [demoFail, setDemoFail] = useState(false);
 
-  const currentTask = findTaskById(moduleSet.tasks, selectedId);
-  const progress = calculateProgress(moduleSet, attempt.answers);
-  const unansweredTasks = getUnansweredTasks(moduleSet.tasks, attempt.answers);
 
-  const currentIndex = moduleSet.tasks.findIndex((t) => t.id === selectedId);
-  
-  const handleBack = () => {
-    if (currentIndex > 0) setSelectedId(moduleSet.tasks[currentIndex - 1].id);
-  };
-  
-  const handleNext = () => {
-    if (currentIndex < moduleSet.tasks.length - 1) setSelectedId(moduleSet.tasks[currentIndex + 1].id);
-  };
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setRequestState({ status: "loading" });
+      try {
+        const loadedSet = await loadSet(SET_ID);
+        if (cancelled) return;
+        setSet(loadedSet);
+        setSelectedId(loadedSet.tasks[0]?.id ?? "");
 
-  const handleFinish = () => {
-    if (unansweredTasks.length > 0) {
-      const confirmed = window.confirm(
-        `Есть незаполненные задания: ${unansweredTasks.map((t) => t.id).join(", ")}. Завершить?`
-      );
-      if (!confirmed) return;
+        const savedId = readAttemptId();
+        if (savedId) {
+          try {
+            const existing = await loadAttempt(savedId);
+            if (!cancelled) {
+              setAttempt(existing);
+              setRequestState({ status: "success" });
+            }
+            return;
+          } catch {
+            clearAttemptId();
+          }
+        }
+
+        const created = await createAttempt(SET_ID);
+        if (cancelled) return;
+        saveAttemptId(created.id);
+        setAttempt(created);
+        setRequestState({ status: "success" });
+      } catch (err) {
+        if (!cancelled) {
+          setRequestState({
+            status: "error",
+            message: err instanceof Error ? err.message : "Неизвестная ошибка",
+          });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const currentTask = set && attempt
+    ? findTaskById(set.tasks, selectedId)
+    : undefined;
+
+  const currentIndex = set
+    ? set.tasks.findIndex((t) => t.id === selectedId)
+    : -1;
+
+  const handleSaveAnswer = async (answer: Answer) => {
+    if (!attempt) return;
+    setIsPending(true);
+    setErrorMessage(null);
+    setRequestState({ status: "loading" });
+
+    const previous = attempt.answers;
+
+
+    setAttempt({
+      ...attempt,
+      answers: previous.some((a) => a.taskId === answer.taskId)
+        ? previous.map((a) => (a.taskId === answer.taskId ? answer : a))
+        : [...previous, answer],
+    });
+
+    try {
+      await saveAnswer(attempt.id, answer, demoFail);
+      setRequestState({ status: "success" });
+    } catch (err) {
+
+
+      setAttempt({ ...attempt, answers: previous });
+      setRequestState({
+        status: "error",
+        message: err instanceof Error ? err.message : "Ошибка сохранения",
+      });
+      setErrorMessage("Не удалось сохранить ответ. Повторите попытку.");
+    } finally {
+      setIsPending(false);
     }
-    dispatch({ type: "SUBMIT" });
-    setShowReview(false);
+  };
+
+  const handleClearAnswer = async (taskId: string) => {
+    if (!attempt) return;
+    setIsPending(true);
+    setErrorMessage(null);
+    setRequestState({ status: "loading" });
+
+    const previous = attempt.answers;
+    setAttempt({
+      ...attempt,
+      answers: previous.filter((a) => a.taskId !== taskId),
+    });
+
+    try {
+      await deleteAnswer(attempt.id, taskId);
+      setRequestState({ status: "success" });
+    } catch (err) {
+      setAttempt({ ...attempt, answers: previous });
+      setRequestState({
+        status: "error",
+        message: err instanceof Error ? err.message : "Ошибка удаления",
+      });
+      setErrorMessage("Не удалось очистить ответ. Повторите попытку.");
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!attempt) return;
+    setIsPending(true);
+    setErrorMessage(null);
+    setRequestState({ status: "loading" });
+
+    try {
+      await submitAttempt(attempt.id);
+      const result = await loadResult(attempt.id);
+      setSubmittedResult(result);
+      setAttempt({ ...attempt, status: "submitted", result });
+      setRequestState({ status: "success" });
+    } catch (err) {
+      setRequestState({
+        status: "error",
+        message: err instanceof Error ? err.message : "Ошибка завершения",
+      });
+      setErrorMessage("Не удалось завершить попытку. Повторите попытку.");
+    } finally {
+      setIsPending(false);
+    }
   };
 
   const handleRestart = () => {
-    dispatch({ type: "RESTART" });
-    setSelectedId(moduleSet.tasks[0]?.id ?? "");
-    setShowReview(false);
+    clearAttemptId();
+    window.location.reload();
   };
 
-  if (attempt.status === "submitted") {
+  if (requestState.status === "loading" && !attempt) {
+    return <main><p>Загрузка модуля…</p></main>;
+  }
+
+  if (requestState.status === "error" && !attempt) {
     return (
       <main>
-        <h1>{moduleSet.title}</h1>
-        <h2>Попытка завершена</h2>
-        <TaskReview 
-          tasks={moduleSet.tasks} 
-          answers={attempt.answers} 
-        />
-        <button onClick={handleRestart} className="btn-primary" style={{ marginTop: 20 }}>
-          Начать новую попытку
+        <h1>Ошибка</h1>
+        <p>{requestState.message}</p>
+        <button onClick={() => window.location.reload()} className="btn-primary">
+          Повторить
         </button>
       </main>
+    );
+  }
+
+  if (!set || !attempt) {
+    return <main><p>Нет данных.</p></main>;
+  }
+
+  const isSubmitted = attempt.status === "submitted";
+
+  if (isSubmitted) {
+    if (!submittedResult) {
+      return <main><p>Загрузка результата…</p></main>;
+    }
+    return (
+      <AttemptResult
+        set={set}
+        attempt={attempt}
+        result={submittedResult}
+        onRestart={handleRestart}
+      />
     );
   }
 
   if (showReview) {
     return (
       <main>
-        <h1>{moduleSet.title}</h1>
+        <h1>{set.title}</h1>
         <h2>Обзор ответов (до завершения)</h2>
-        <TaskReview 
-          tasks={moduleSet.tasks} 
-          answers={attempt.answers} 
-          onClear={(taskId) => dispatch({ type: "CLEAR_ANSWER", taskId })}
+        <TaskReview
+          tasks={set.tasks}
+          answers={attempt.answers}
+          onClear={handleClearAnswer}
           onSelectTask={(taskId) => {
             setSelectedId(taskId);
             setShowReview(false);
           }}
+          disabled={isPending}
         />
         <div style={{ marginTop: 20, display: "flex", gap: 10 }}>
-          <button onClick={() => setShowReview(false)} className="btn-secondary">
+          <button onClick={() => setShowReview(false)} className="btn-secondary" disabled={isPending}>
             Вернуться к заданиям
           </button>
-          <button onClick={handleFinish} className="btn-success">
+          <button onClick={handleSubmit} className="btn-success" disabled={isPending}>
             Завершить
           </button>
         </div>
@@ -133,17 +227,26 @@ export default function App() {
 
   return (
     <main>
-      <h1>{moduleSet.title}</h1>
-      
+      <h1>{set.title}</h1>
+
+      {errorMessage && (
+        <div style={{ color: "#b91c1c", marginBottom: 12 }}>
+          {errorMessage}{" "}
+          <button onClick={() => setErrorMessage(null)} className="btn-secondary btn-sm">
+            Скрыть
+          </button>
+        </div>
+      )}
+
       <div className="progress-container">
         <div className="progress-text">
-          Заполнено: {progress.filled} из {progress.total}
+          Заполнено: {attempt.answers.length} из {set.tasks.length}
         </div>
-        <progress value={progress.filled} max={progress.total} />
+        <progress value={attempt.answers.length} max={set.tasks.length} />
       </div>
 
       <TaskList
-        tasks={moduleSet.tasks}
+        tasks={set.tasks}
         selectedId={selectedId}
         answers={attempt.answers}
         onSelect={setSelectedId}
@@ -153,33 +256,48 @@ export default function App() {
         <TaskCard
           task={currentTask}
           answer={attempt.answers.find((a) => a.taskId === currentTask.id)}
-          onChange={(answer) => dispatch({ type: "CHANGE_ANSWER", answer })}
+          onChange={handleSaveAnswer}
+          disabled={isPending}
         />
       ) : (
         <p>Задание не найдено.</p>
       )}
 
       <div className="controls">
-        <button onClick={handleBack} disabled={currentIndex === 0} className="btn-secondary">
+        <button
+          onClick={() => currentIndex > 0 && setSelectedId(set.tasks[currentIndex - 1].id)}
+          disabled={currentIndex <= 0 || isPending}
+          className="btn-secondary"
+        >
           Назад
         </button>
-        <button onClick={handleNext} disabled={currentIndex === moduleSet.tasks.length - 1} className="btn-secondary">
+        <button
+          onClick={() => currentIndex < set.tasks.length - 1 && setSelectedId(set.tasks[currentIndex + 1].id)}
+          disabled={currentIndex === set.tasks.length - 1 || isPending}
+          className="btn-secondary"
+        >
           Далее
         </button>
-        
-        <button 
-          onClick={() => dispatch({ type: "CLEAR_ANSWER", taskId: selectedId })} 
-          className="btn-secondary"
-          style={{ marginLeft: 'auto' }}
-        >
+
+        <button onClick={() => handleClearAnswer(selectedId)} className="btn-secondary btn-right" disabled={isPending}>
           Очистить
         </button>
 
-        <button onClick={() => setShowReview(true)} className="btn-secondary">
+        <button onClick={() => setShowReview(true)} className="btn-secondary" disabled={isPending}>
           Обзор
         </button>
 
-        <button onClick={handleFinish} className="btn-success">
+        <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <input
+            type="checkbox"
+            checked={demoFail}
+            onChange={(e) => setDemoFail(e.target.checked)}
+            disabled={isPending}
+          />
+          Ошибка сервера
+        </label>
+
+        <button onClick={handleSubmit} className="btn-success" disabled={isPending}>
           Завершить
         </button>
       </div>

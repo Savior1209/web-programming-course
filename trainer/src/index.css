@@ -192,6 +192,15 @@ progress::-moz-progress-bar {
   background: #cbd5e1;
 }
 
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 0.85rem;
+}
+
+.btn-right {
+  margin-left: auto;
+}
+
 .btn-primary {
   background: #3b82f6;
   color: white;

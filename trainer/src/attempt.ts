@@ -31,8 +31,7 @@ export function attemptReducer(state: AttemptState, action: AttemptAction): Atte
     }
     case "CLEAR_ANSWER": {
       return {
-        ...state,
-        answers: state.answers.filter((a) => a.taskId !== action.taskId),
+        ...state, answers: state.answers.filter((a) => a.taskId !== action.taskId),
       };
     }
     case "SUBMIT": {

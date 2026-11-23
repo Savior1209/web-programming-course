@@ -4,9 +4,10 @@ type TaskCardProps = {
   task: Task;
   answer: Answer | undefined;
   onChange: (answer: Answer) => void;
+  disabled?: boolean;
 };
 
-export function TaskCard({ task, answer, onChange }: TaskCardProps) {
+export function TaskCard({ task, answer, onChange, disabled }: TaskCardProps) {
   return (
     <article className="task-card">
       <p><strong>Тема:</strong> {task.topic}</p>
@@ -15,7 +16,7 @@ export function TaskCard({ task, answer, onChange }: TaskCardProps) {
       {task.code !== undefined && <pre>{task.code}</pre>}
 
       {task.kind === "single-choice" ? (
-        <fieldset>
+        <fieldset disabled={disabled}>
           <legend>Выберите вариант:</legend>
           {task.options.map((option) => (
             <label key={option.id}>
@@ -41,6 +42,7 @@ export function TaskCard({ task, answer, onChange }: TaskCardProps) {
               onChange={(e) => {
                 onChange({ taskId: task.id, kind: "short-text", text: e.target.value });
               }}
+
             />
           </label>
           
