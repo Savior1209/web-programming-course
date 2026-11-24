@@ -1,14 +1,13 @@
 import type { TrainingSet } from "../domain";
-import type { ServerAttempt } from "../api/attempts";
+import type { AttemptResultData } from "../api/attempts";
 
 type AttemptResultProps = {
   set: TrainingSet;
-  attempt: ServerAttempt;
-  result: NonNullable<ServerAttempt["result"]>;
+  result: AttemptResultData;
   onRestart: () => void;
 };
 
-export function AttemptResult({ set, attempt, result, onRestart }: AttemptResultProps) {
+export function AttemptResult({ set, result, onRestart }: AttemptResultProps) {
   return (
     <main>
       <h1>{set.title}</h1>
@@ -22,27 +21,39 @@ export function AttemptResult({ set, attempt, result, onRestart }: AttemptResult
           <> — {result.score} из {result.maxScore}</>
         )}
       </p>
+      
       <ul className="review-list">
-        {set.tasks.map((task) => {
-          const answer = attempt.answers.find((a) => a.taskId === task.id);
-          const answered = answer !== undefined;
-          
+        {result.items.map((item) => {
+          const task = set.tasks.find((t) => t.id === item.taskId);
+          if (!task) return null;
+
           let label = "Нет ответа";
-          if (result.status === "pending-review") {
+          if (item.status === "pending-review") {
             label = "Ожидает проверки";
-          } else if (answered) {
-            label = `Оценка: ${result.score} из ${result.maxScore}`;
+          } else if (item.status === "correct") {
+            label = "Верно";
+          } else if (item.status === "incorrect") {
+            label = "Неверно";
+          } else if (item.status === "unanswered") {
+            label = "Пропущено (0 баллов)";
           }
 
           return (
-            <li key={task.id} className="review-item">
-              <strong>{task.id}</strong>: {task.prompt}
+            <li key={item.taskId} className="review-item">
+              <strong>{item.taskId}</strong>: {task.prompt}
               <br />
               <span>{label}</span>
+              {item.feedback && (
+                <>
+                  <br />
+                  <small>Комментарий: {item.feedback}</small>
+                </>
+              )}
             </li>
           );
         })}
       </ul>
+      
       <button onClick={onRestart} className="btn-primary" style={{ marginTop: 20 }}>
         Начать новую попытку
       </button>

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { TrainingSet, Answer } from "./domain";
 import { findTaskById } from "./domain";
 import { loadSet } from "./api/sets";
-import {createAttempt, loadAttempt, saveAnswer, deleteAnswer, submitAttempt, loadResult, type ServerAttempt} from "./api/attempts";
+import {createAttempt, loadAttempt, saveAnswer, deleteAnswer, submitAttempt, type ServerAttempt} from "./api/attempts";
 import {saveAttemptId,readAttemptId,clearAttemptId,type RequestState} from "./model/attemptServer";
 import { TaskList } from "./components/TaskList";
 import { TaskCard } from "./components/TaskCard";
@@ -134,28 +134,28 @@ export default function App() {
     }
   };
 
-  const handleSubmit = async () => {
-    if (!attempt) return;
-    setIsPending(true);
-    setErrorMessage(null);
-    setRequestState({ status: "loading" });
+const handleSubmit = async () => {
+  if (!attempt) return;
+  setIsPending(true);
+  setErrorMessage(null);
+  setRequestState({ status: "loading" });
 
-    try {
-      await submitAttempt(attempt.id);
-      const result = await loadResult(attempt.id);
-      setSubmittedResult(result);
-      setAttempt({ ...attempt, status: "submitted", result });
-      setRequestState({ status: "success" });
-    } catch (err) {
-      setRequestState({
-        status: "error",
-        message: err instanceof Error ? err.message : "Ошибка завершения",
-      });
-      setErrorMessage("Не удалось завершить попытку. Повторите попытку.");
-    } finally {
-      setIsPending(false);
-    }
-  };
+  try {
+    const result = await submitAttempt(attempt.id);
+    
+    setSubmittedResult(result);
+    setAttempt({ ...attempt, status: "submitted", result });
+    setRequestState({ status: "success" });
+  } catch (err) {
+    setRequestState({
+      status: "error",
+      message: err instanceof Error ? err.message : "Ошибка завершения",
+    });
+    setErrorMessage("Не удалось завершить попытку. Повторите попытку.");
+  } finally {
+    setIsPending(false);
+  }
+};
 
   const handleRestart = () => {
     clearAttemptId();
@@ -191,7 +191,6 @@ export default function App() {
     return (
       <AttemptResult
         set={set}
-        attempt={attempt}
         result={submittedResult}
         onRestart={handleRestart}
       />

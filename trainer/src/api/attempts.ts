@@ -1,16 +1,28 @@
 import type { Answer } from "../domain";
 import { request } from "./http";
 
+export type ResultItem = {
+  taskId: string;
+  status: "correct" | "incorrect" | "unanswered" | "pending-review";
+  score: number | null;
+  maxScore: number;
+  feedback: string | null;
+};
+
+export type AttemptResultData = {
+  attemptId: string;
+  status: "graded" | "pending-review";
+  score: number | null;
+  maxScore: number;
+  items: ResultItem[];
+};
+
 export type ServerAttempt = {
   id: string;
   setId: string;
   status: "in-progress" | "submitted";
   answers: Answer[];
-  result?: {
-    status: "graded" | "pending-review";
-    score: number | null;
-    maxScore: number;
-  } | null;
+  result?: AttemptResultData | null;
 };
 
 export function createAttempt(setId: string): Promise<ServerAttempt> {
@@ -28,8 +40,8 @@ export function saveAnswer(
   attemptId: string,
   answer: Answer,
   fail = false
-): Promise<Answer> {
-  return request<Answer>(
+): Promise<ServerAttempt> {
+  return request<ServerAttempt>(
     `/api/attempts/${attemptId}/answers/${answer.taskId}`,
     {
       method: "PUT",
@@ -42,21 +54,22 @@ export function saveAnswer(
 export function deleteAnswer(
   attemptId: string,
   taskId: string
-): Promise<void> {
-  return request<void>(`/api/attempts/${attemptId}/answers/${taskId}`, {
-    method: "DELETE",
-  });
+): Promise<ServerAttempt> {
+  return request<ServerAttempt>(
+    `/api/attempts/${attemptId}/answers/${taskId}`,
+    {
+      method: "DELETE",
+    }
+  );
 }
 
-export function submitAttempt(attemptId: string): Promise<void> {
-  return request<void>(`/api/attempts/${attemptId}/submit`, {
+export function submitAttempt(attemptId: string): Promise<AttemptResultData> {
+  return request<AttemptResultData>(`/api/attempts/${attemptId}/submit`, {
     method: "POST",
     body: JSON.stringify({}),
   });
 }
 
-export function loadResult(attemptId: string): Promise<ServerAttempt["result"]> {
-  return request<ServerAttempt["result"]>(
-    `/api/attempts/${attemptId}/result`
-  );
+export function loadResult(attemptId: string): Promise<AttemptResultData> {
+  return request<AttemptResultData>(`/api/attempts/${attemptId}/result`);
 }
